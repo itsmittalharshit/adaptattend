@@ -1,0 +1,29 @@
+# Web framework
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+
+# Auth / tokens
+python-jose[cryptography]==3.3.0
+pyotp==2.9.0
+
+# Face recognition (Python 3.12 only — NOT 3.13)
+deepface==0.0.93
+tf-keras==2.16.0
+Pillow==10.4.0
+numpy==1.26.4
+
+# Geo maths
+geopy==2.4.1
+
+# Encryption
+cryptography==42.0.8
+
+# Redis (one-time-use token store)
+redis[asyncio]==5.0.8
+
+# Config
+pydantic-settings==2.3.4
+python-dotenv==1.0.1
+
+# Multipart (file uploads)
+python-multipart==0.0.9
