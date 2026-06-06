@@ -270,7 +270,7 @@ function Navbar() {
             title={isDark ? 'Switch to light' : 'Switch to dark'}>
             {isDark ? <Sun size={18} /> : <Moon size={18} />}
           </button>
-          <a href="https://github.com/itsmittalharshit" target="_blank" rel="noopener noreferrer"
+          <a href="https://github.com/itsmittalharshit/adaptattend" target="_blank" rel="noopener noreferrer"
             className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm px-4 py-2 rounded-lg transition font-medium shadow-lg shadow-indigo-600/20">
             <Github size={15} /> View Source
           </a>
@@ -295,7 +295,7 @@ function Navbar() {
                   {l.label}
                 </a>
               ))}
-              <a href="https://github.com/itsmittalharshit" target="_blank" rel="noopener noreferrer"
+              <a href="https://github.com/itsmittalharshit/adaptattend" target="_blank" rel="noopener noreferrer"
                 className="flex items-center justify-center gap-2 bg-indigo-600 text-white text-sm px-4 py-2 rounded-lg mt-2">
                 <Github size={14} /> View Source
               </a>
@@ -465,7 +465,7 @@ function HeroSection() {
 
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.7, delay: 0.3 }}
           className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-20">
-          <a href="https://github.com/itsmittalharshit" target="_blank" rel="noopener noreferrer"
+          <a href="https://github.com/itsmittalharshit/adaptattend" target="_blank" rel="noopener noreferrer"
             className="group inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-8 py-4 rounded-xl font-semibold text-base transition shadow-lg shadow-indigo-600/25">
             <Github size={18} /> View on GitHub
             <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
@@ -765,7 +765,7 @@ function PortfolioSection() {
                 AdaptAttend is a full-stack mobile portfolio project — offline-first architecture, on-device biometrics, type-safe SQLite ORM, and a polished Material 3 UI. Every component is production-ready, not toy code.
               </p>
               <div className="flex flex-wrap gap-3 justify-center">
-                <a href="https://github.com/itsmittalharshit" target="_blank" rel="noopener noreferrer"
+                <a href="https://github.com/itsmittalharshit/adaptattend" target="_blank" rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-3 rounded-xl font-semibold transition shadow-lg shadow-indigo-600/20">
                   <Github size={17} /> View on GitHub <ExternalLink size={13} className="opacity-60" />
                 </a>
