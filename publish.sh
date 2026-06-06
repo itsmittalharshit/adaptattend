@@ -67,16 +67,8 @@ echo ""
 echo "🌐  Deploying website to Vercel..."
 cd frontend
 
-# Install Vercel CLI if missing
-if ! command -v vercel &>/dev/null; then
-  echo "📥  Installing Vercel CLI..."
-  npm install -g vercel
-fi
-
-# Deploy (--yes accepts defaults; --prod pushes to production URL)
-vercel --prod --yes \
-  --name adaptattend \
-  --build-env NEXT_PUBLIC_APP_NAME=AdaptAttend
+# Deploy via npx (no global install needed)
+npx vercel@latest --prod --yes --name adaptattend
 
 echo ""
 echo "╔══════════════════════════════════════════════════════════════╗"
