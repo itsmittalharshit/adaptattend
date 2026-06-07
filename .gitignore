@@ -1,3 +1,6 @@
+# ── TFLite model (large binary — download via mobile/download_model.sh) ────────
+mobile/assets/models/*.tflite
+
 # ── Flutter / Dart ─────────────────────────────────────────────────────────────
 mobile/.dart_tool/
 mobile/.flutter-plugins

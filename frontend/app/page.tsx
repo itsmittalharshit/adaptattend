@@ -77,10 +77,10 @@ const METHODS = [
   {
     icon: ScanFace,
     title: 'Manager Face Scan',
-    desc: 'Manager scans the employee\'s face on the manager\'s own device. LBP recognition runs 100% on-device — no server, no cloud upload. Employee can\'t fake from home.',
+    desc: 'Manager scans the employee\'s face on the manager\'s own device. MobileFaceNet TFLite runs 100% on-device — no server, no cloud upload. Employee can\'t fake from home.',
     color: 'from-emerald-500 to-teal-600',
     pill: 'On-device AI', pillColor: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
-    detail: ['LBP histogram matching', 'Google ML Kit detection', 'Runs on manager\'s device', 'Zero cloud dependency'],
+    detail: ['MobileFaceNet embeddings', 'Google ML Kit detection', 'Runs on manager\'s device', 'Zero cloud dependency'],
   },
 ];
 
@@ -119,7 +119,7 @@ const TECH_STACK = [
   },
   {
     category: 'On-Device AI', icon: Fingerprint, color: 'from-emerald-500 to-teal-600',
-    items: ['Google ML Kit face detect', 'LBP histogram (256-bin)', 'Cosine similarity matching', 'image pkg — crop / resize', 'SharedPreferences storage'],
+    items: ['Google ML Kit face detect', 'MobileFaceNet TFLite (128-d)', 'Cosine similarity matching', 'image pkg — crop / resize', 'SharedPreferences storage'],
   },
   {
     category: 'Offline Security', icon: Lock, color: 'from-violet-500 to-purple-600',
@@ -132,7 +132,7 @@ const FEATURES = [
   { icon: WifiOff,    title: 'Truly offline',         desc: 'Every feature — TOTP, GPS, face scan — works with zero internet.' },
   { icon: Hash,       title: 'Rotating TOTP codes',   desc: '15-second windows, HMAC-SHA1 — same algorithm as Google Authenticator.' },
   { icon: Globe,      title: 'Geofence attendance',   desc: 'Haversine formula offline — configurable radius, no GPS spoofing.' },
-  { icon: Fingerprint,title: 'On-device face AI',     desc: 'LBP + ML Kit — recognition runs on the phone, no server involved.' },
+  { icon: Fingerprint,title: 'On-device face AI',     desc: 'MobileFaceNet TFLite + ML Kit — runs on the phone, no server involved.' },
   { icon: TrendingUp, title: 'Rich analytics',        desc: 'Daily heatmaps, punctuality scores, method breakdowns — all local.' },
   { icon: Database,   title: 'Drift + SQLite',        desc: 'Type-safe ORM, reactive streams, 30-day demo data pre-seeded.' },
 ];
@@ -194,7 +194,7 @@ function TiltCard({ children, className = '' }: { children: React.ReactNode; cla
 // ── Scrolling tech ticker ─────────────────────────────────────────────────────
 const TICKER_ITEMS = [
   'Flutter 3', 'Dart', 'Drift ORM', 'SQLite', 'Google ML Kit',
-  'LBP Face AI', 'TOTP Offline', 'Haversine GPS', 'Material 3',
+  'MobileFaceNet', 'TOTP Offline', 'Haversine GPS', 'Material 3',
   'go_router', 'Geolocator', 'SharedPrefs', 'image_picker',
 ];
 function TechTicker() {
@@ -714,7 +714,7 @@ function TechStackSection() {
                 { arrow: true },
                 { label: 'Drift ORM', sub: 'SQLite on-device', bg: 'bg-violet-500/15 border-violet-500/30 text-violet-400' },
                 { arrow: true },
-                { label: 'ML Kit + LBP', sub: 'Face AI on-device', bg: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400' },
+                { label: 'ML Kit + TFLite', sub: 'Face AI on-device', bg: 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400' },
               ].map((item, i) =>
                 'arrow' in item
                   ? <ArrowRight key={i} size={18} className={`rotate-90 md:rotate-0 ${isDark ? 'text-gray-600' : 'text-gray-400'}`} />
@@ -840,7 +840,7 @@ function ContactSection() {
             <div className="space-y-4">
               {[
                 { icon: Smartphone, label: 'Offline-first Flutter app',   desc: 'Drift ORM + SQLite — every feature works with zero internet' },
-                { icon: Fingerprint, label: 'On-device face recognition', desc: 'LBP + Google ML Kit — no server, no cloud upload' },
+                { icon: Fingerprint, label: 'On-device face recognition', desc: 'MobileFaceNet TFLite + ML Kit — no server, no cloud upload' },
                 { icon: BarChart3,   label: 'Rich analytics dashboard',   desc: 'Daily heatmaps, punctuality scores, method breakdowns' },
               ].map(({ icon: Icon, label, desc }) => (
                 <div key={label} className="flex gap-4">

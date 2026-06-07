@@ -33,6 +33,9 @@ dependencies:
   # On-device face detection (Google ML Kit — no model download needed)
   google_mlkit_face_detection: ^0.11.0
 
+  # TFLite face recognition (MobileFaceNet 128-d embeddings)
+  tflite_flutter: ^0.12.0
+
   # Geolocation
   geolocator: ^12.0.0
   permission_handler: ^11.3.1
@@ -67,3 +70,4 @@ flutter:
   assets:
     - assets/images/
     - assets/icons/
+    - assets/models/

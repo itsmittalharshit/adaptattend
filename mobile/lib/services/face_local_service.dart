@@ -1,12 +1,16 @@
-/// On-device face recognition — no server, no model download.
+/// On-device face recognition — no server, no cloud.
 ///
 /// Pipeline:
-///   1. Google ML Kit FaceDetector  → face bounding box from the photo file
-///   2. `image` package             → crop + resize to 64×64 greyscale
-///   3. LBP histogram (256 bins)    → compact face descriptor
+///   1. Google ML Kit FaceDetector  → face bounding box
+///   2. `image` package             → crop + resize to 112×112 RGB
+///   3. MobileFaceNet TFLite model  → 128-d float32 embedding
 ///   4. Cosine similarity           → compare enrollment vs selfie
 ///
-/// Enrollment is stored in SharedPreferences as a JSON list, keyed by userId.
+/// Model: assets/models/mobilefacenet.tflite
+///   Input  : [1, 112, 112, 3] float32, values in [-1, 1]
+///   Output : [1, 128] float32 L2-normalised embedding
+///
+/// Embeddings are stored in SharedPreferences as JSON, keyed by userId.
 
 import 'dart:convert';
 import 'dart:io';
@@ -17,6 +21,7 @@ import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:tflite_flutter/tflite_flutter.dart';
 
 import '../data/database.dart' show AppUser;
 
@@ -45,9 +50,14 @@ class FaceMatchResult {
 }
 
 class FaceLocalService {
-  static const _cropSize       = 64;   // pixels
-  static const _matchThreshold = 0.82; // cosine similarity for same-person
+  // ── Config ────────────────────────────────────────────────────────────────
+  static const _modelAsset     = 'assets/models/mobilefacenet.tflite';
+  static const _inputSize      = 112;   // MobileFaceNet input: 112×112
+  static const _embeddingDim   = 128;   // MobileFaceNet output: 128-d
+  static const _matchThreshold = 0.70;  // cosine similarity — same person
 
+  // ── Singletons (lazy-initialised) ─────────────────────────────────────────
+  static Interpreter? _interpreter;
   static final _detector = FaceDetector(
     options: FaceDetectorOptions(
       performanceMode: FaceDetectorMode.accurate,
@@ -60,8 +70,6 @@ class FaceLocalService {
   // ── Public API ─────────────────────────────────────────────────────────────
 
   /// Compute face embedding from [imagePath] and store it for [userId].
-  /// Called when manager saves an employee's profile photo.
-  /// Returns true on success, false if no face was found.
   static Future<bool> enroll(String userId, String imagePath) async {
     final embedding = await _embed(imagePath);
     if (embedding == null) return false;
@@ -71,9 +79,25 @@ class FaceLocalService {
     return true;
   }
 
+  /// Enroll from a Flutter asset bundle path (e.g. 'assets/images/emma.jpg').
+  static Future<bool> enrollFromAsset(String userId, String assetPath) async {
+    try {
+      final data  = await rootBundle.load(assetPath);
+      final bytes = data.buffer.asUint8List();
+      final dir   = await getTemporaryDirectory();
+      final tmp   = File('${dir.path}/face_enroll_$userId.jpg');
+      await tmp.writeAsBytes(bytes);
+      final success = await enroll(userId, tmp.path);
+      await tmp.delete().catchError((_) {});
+      return success;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Compare [selfiePath] against the stored embedding for [userId].
   static Future<FaceLocalResult> verify(String userId, String selfiePath) async {
-    final prefs = await SharedPreferences.getInstance();
+    final prefs  = await SharedPreferences.getInstance();
     final stored = prefs.getString('face_embed_$userId');
 
     if (stored == null) {
@@ -106,26 +130,7 @@ class FaceLocalService {
     return prefs.containsKey('face_embed_$userId');
   }
 
-  /// Enroll from a Flutter asset bundle path (e.g. 'assets/images/emma.jpg').
-  /// Copies the asset to a temp file, runs [enroll], then cleans up.
-  /// Used to pre-seed demo employees at app launch.
-  static Future<bool> enrollFromAsset(String userId, String assetPath) async {
-    try {
-      final data  = await rootBundle.load(assetPath);
-      final bytes = data.buffer.asUint8List();
-      final dir   = await getTemporaryDirectory();
-      final tmp   = File('${dir.path}/face_enroll_$userId.jpg');
-      await tmp.writeAsBytes(bytes);
-      final success = await enroll(userId, tmp.path);
-      await tmp.delete().catchError((_) {});
-      return success;
-    } catch (_) {
-      return false;
-    }
-  }
-
   /// 1-to-N search: find the best-matching enrolled employee for [selfiePath].
-  /// Returns null if no face is detected in the selfie or no match is found.
   static Future<FaceMatchResult?> findBestMatch(
       String selfiePath, List<AppUser> users) async {
     final selfieEmbed = await _embed(selfiePath);
@@ -137,8 +142,8 @@ class FaceLocalService {
     for (final user in users) {
       final stored = prefs.getString('face_embed_${user.id}');
       if (stored == null) continue;
-      final enrolled  = (jsonDecode(stored) as List).cast<double>();
-      final sim       = _cosine(enrolled, selfieEmbed);
+      final enrolled = (jsonDecode(stored) as List).cast<double>();
+      final sim      = _cosine(enrolled, selfieEmbed);
       if (sim >= _matchThreshold && (best == null || sim > best.confidence)) {
         best = FaceMatchResult(user: user, confidence: sim);
       }
@@ -147,10 +152,14 @@ class FaceLocalService {
     return best;
   }
 
-  // ── Internals ─────────────────────────────────────────────────────────────
+  // ── TFLite inference ──────────────────────────────────────────────────────
 
-  /// Detect the largest face in [imagePath], crop it and return a 256-d LBP
-  /// histogram. Returns null if no face is detected or image can't be read.
+  static Future<Interpreter> _getInterpreter() async {
+    _interpreter ??= await Interpreter.fromAsset(_modelAsset);
+    return _interpreter!;
+  }
+
+  /// Detect face, crop, run MobileFaceNet, return L2-normalised 128-d embedding.
   static Future<List<double>?> _embed(String imagePath) async {
     // ── 1. ML Kit face detection ──────────────────────────────────────────
     final inputImage = InputImage.fromFilePath(imagePath);
@@ -162,20 +171,18 @@ class FaceLocalService {
     }
     if (faces.isEmpty) return null;
 
-    // Pick the largest detected face
     final face = faces.reduce((a, b) =>
         (a.boundingBox.width * a.boundingBox.height) >=
         (b.boundingBox.width * b.boundingBox.height) ? a : b);
 
-    // ── 2. Load image with the Dart `image` package ───────────────────────
+    // ── 2. Load + crop + resize face ──────────────────────────────────────
     final bytes = await File(imagePath).readAsBytes();
     final full  = img.decodeImage(bytes);
     if (full == null) return null;
 
-    // ── 3. Crop face region (25% padding on each side) ────────────────────
-    final bb    = face.boundingBox;
-    final padX  = (bb.width  * 0.25).round();
-    final padY  = (bb.height * 0.25).round();
+    final bb   = face.boundingBox;
+    final padX = (bb.width  * 0.25).round();
+    final padY = (bb.height * 0.25).round();
     final cropX = (bb.left.toInt()   - padX).clamp(0, full.width  - 1);
     final cropY = (bb.top.toInt()    - padY).clamp(0, full.height - 1);
     final cropW = (bb.width.toInt()  + padX * 2).clamp(1, full.width  - cropX);
@@ -183,54 +190,56 @@ class FaceLocalService {
 
     final cropped = img.copyCrop(full,
         x: cropX, y: cropY, width: cropW, height: cropH);
-
-    // ── 4. Resize → greyscale ─────────────────────────────────────────────
     final resized = img.copyResize(cropped,
-        width: _cropSize, height: _cropSize,
+        width: _inputSize, height: _inputSize,
         interpolation: img.Interpolation.linear);
-    final grey = img.grayscale(resized);
 
-    // ── 5. LBP histogram ─────────────────────────────────────────────────
-    return _lbp(grey);
+    // ── 3. Build input tensor [1, 112, 112, 3] float32 in [-1, 1] ────────
+    final input = _imageToInput(resized);
+
+    // ── 4. Allocate output matching the model's actual shape and run ─────────
+    final interp = await _getInterpreter();
+
+    // Read shape from the model (e.g. [1, 128] or [1, 192])
+    final outShape = interp.getOutputTensor(0).shape; // [batchSize, embDim]
+    final embDim   = outShape.last;
+
+    // Output must be nested to match [1, embDim]
+    final outputBuffer = [List<double>.filled(embDim, 0.0)];
+    final outputs = <int, Object>{0: outputBuffer};
+    interp.runForMultipleInputs([input], outputs);
+
+    return _l2Normalize(outputBuffer[0]);
   }
 
-  /// Compute a 256-bin Local Binary Pattern histogram from a greyscale image.
-  /// LBP captures micro-texture patterns unique to each face.
-  static List<double> _lbp(img.Image grey) {
-    final w    = grey.width;
-    final h    = grey.height;
-    final hist = List<double>.filled(256, 0.0);
-
-    for (int y = 1; y < h - 1; y++) {
-      for (int x = 1; x < w - 1; x++) {
-        final c = img.getLuminance(grey.getPixel(x, y));
-        int code = 0;
-
-        // 8 clockwise neighbours starting from top-left
-        final neighbors = [
-          img.getLuminance(grey.getPixel(x - 1, y - 1)),
-          img.getLuminance(grey.getPixel(x,     y - 1)),
-          img.getLuminance(grey.getPixel(x + 1, y - 1)),
-          img.getLuminance(grey.getPixel(x + 1, y    )),
-          img.getLuminance(grey.getPixel(x + 1, y + 1)),
-          img.getLuminance(grey.getPixel(x,     y + 1)),
-          img.getLuminance(grey.getPixel(x - 1, y + 1)),
-          img.getLuminance(grey.getPixel(x - 1, y    )),
-        ];
-
-        for (int i = 0; i < 8; i++) {
-          if (neighbors[i] >= c) code |= (1 << i);
-        }
-        hist[code]++;
-      }
-    }
-
-    // Normalise so embeddings are comparable regardless of image size
-    final total = ((w - 2) * (h - 2)).toDouble();
-    return hist.map((v) => v / total).toList();
+  /// Returns a [1][H][W][3] nested list of float32 values in [-1, 1].
+  static List _imageToInput(img.Image image) {
+    final h = image.height;
+    final w = image.width;
+    return List.generate(1, (_) =>
+      List.generate(h, (y) =>
+        List.generate(w, (x) {
+          final p = image.getPixel(x, y);
+          return [
+            (p.r.toDouble() - 127.5) / 128.0,
+            (p.g.toDouble() - 127.5) / 128.0,
+            (p.b.toDouble() - 127.5) / 128.0,
+          ];
+        })
+      )
+    );
   }
 
-  /// Cosine similarity between two equal-length vectors. Range [–1, 1].
+  // ── Math helpers ─────────────────────────────────────────────────────────
+
+  static List<double> _l2Normalize(List<double> v) {
+    double norm = 0;
+    for (final x in v) norm += x * x;
+    norm = sqrt(norm);
+    if (norm == 0) return v;
+    return v.map((x) => x / norm).toList();
+  }
+
   static double _cosine(List<double> a, List<double> b) {
     double dot = 0, na = 0, nb = 0;
     for (int i = 0; i < a.length; i++) {

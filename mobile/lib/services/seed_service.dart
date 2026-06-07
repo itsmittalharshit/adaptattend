@@ -112,7 +112,14 @@ Future<void> seedDemoData() async {
 /// safe to call on every launch — skips instantly after the first run.
 Future<void> seedFaceEmbeddings() async {
   final prefs = await SharedPreferences.getInstance();
-  if (prefs.getBool('face_demo_seeded') == true) return;
+  // v2 flag — forces re-seed after LBP→TFLite upgrade
+  if (prefs.getBool('face_demo_seeded_v2') == true) return;
+
+  // Clear stale LBP embeddings
+  await prefs.remove('face_demo_seeded');
+  for (final id in ['emp-001','emp-002','emp-003','emp-004','emp-005']) {
+    await prefs.remove('face_embed_$id');
+  }
 
   const assetMap = [
     ('emp-001', 'assets/images/emma.jpg'),
@@ -122,9 +129,15 @@ Future<void> seedFaceEmbeddings() async {
     ('emp-005', 'assets/images/zara.jpg'),
   ];
 
+  int enrolled = 0;
   for (final (id, asset) in assetMap) {
-    await FaceLocalService.enrollFromAsset(id, asset);
+    final ok = await FaceLocalService.enrollFromAsset(id, asset);
+    if (ok) enrolled++;
   }
 
-  await prefs.setBool('face_demo_seeded', true);
+  // Only mark done if at least one enrollment succeeded.
+  // If model is missing, this will retry on next launch.
+  if (enrolled > 0) {
+    await prefs.setBool('face_demo_seeded_v2', true);
+  }
 }

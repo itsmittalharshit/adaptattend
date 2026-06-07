@@ -30,6 +30,11 @@ android {
         versionName = flutter.versionName
     }
 
+    // Prevent TFLite model from being compressed in the APK
+    aaptOptions {
+        noCompress += listOf("tflite")
+    }
+
     buildTypes {
         release {
             // TODO: Add your own signing config for the release build.
